@@ -1,25 +1,27 @@
-import logo from './logo.svg';
-import './App.css';
+import React from 'react'
+import { Navbar } from './Components/Navbar';
+import { Hero } from './Components/Hero';
+import { Footer } from './Components/Footer';
+import { BrowserRouter,Routes, Route } from 'react-router-dom';
 
-function App() {
+import Pert from './Components/Pert';
+
+export const App = () => {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    
+    <div class="absolute inset-0 -z-10 h-full w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
+      <Navbar></Navbar>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Hero />} />
+          <Route path="/pert" element={<Pert />} />
+        </Routes>
+        </BrowserRouter>
+      <Footer></Footer>
+    
     </div>
-  );
+
+  )
 }
 
 export default App;
