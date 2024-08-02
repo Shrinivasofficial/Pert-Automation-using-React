@@ -4,9 +4,10 @@ import { toPng } from 'html-to-image';
 
 export default function Pert() {
   const [numTasks, setNumTasks] = useState(1);
-  const [tasks, setTasks] = useState([{ optimistic: '', mostLikely: '', pessimistic: '', predecessor: '' }]);
+  const [tasks, setTasks] = useState([{ optimistic: '', mostLikely: '', pessimistic: '', predecessors: '' }]);
   const [calculatedTasks, setCalculatedTasks] = useState([]);
   const [criticalPath, setCriticalPath] = useState([]);
+  const [criticalPathDuration, setCriticalPathDuration] = useState(0);
   const graphContainerRef = useRef(null);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function Pert() {
     if (newNumTasks > tasks.length) {
       const newTasks = [...tasks];
       for (let i = tasks.length; i < newNumTasks; i++) {
-        newTasks.push({ optimistic: '', mostLikely: '', pessimistic: '', predecessor: '' });
+        newTasks.push({ optimistic: '', mostLikely: '', pessimistic: '', predecessors: '' });
       }
       setTasks(newTasks);
     } else {
@@ -61,13 +62,11 @@ export default function Pert() {
 
     // Forward pass
     newTasks.forEach((task, index) => {
-      if (task.predecessor) {
-        const predecessorIndex = parseInt(task.predecessor, 10) - 1;
-        if (predecessorIndex >= 0 && predecessorIndex < newTasks.length) {
-          const predecessorTask = newTasks[predecessorIndex];
-          task.ES = predecessorTask.EF;
-          task.EF = task.ES + task.duration;
-        }
+      if (task.predecessors) {
+        const predecessorIndices = task.predecessors.split(',').map((p) => parseInt(p.trim(), 10) - 1);
+        const maxEF = Math.max(...predecessorIndices.map((i) => newTasks[i]?.EF || 0));
+        task.ES = maxEF;
+        task.EF = task.ES + task.duration;
       } else {
         task.ES = 0;
         task.EF = task.duration;
@@ -79,27 +78,25 @@ export default function Pert() {
     const projectDuration = lastTask.EF;
 
     newTasks.reverse().forEach((task) => {
-      if (task.predecessor) {
-        const successorTasks = newTasks.filter((t) => t.predecessor === (task.index + 1).toString());
-        if (successorTasks.length > 0) {
-          task.LF = Math.min(...successorTasks.map((t) => t.LS));
-        } else {
-          task.LF = projectDuration;
-        }
-        task.LS = task.LF - task.duration;
+      const successorTasks = newTasks.filter((t) => t.predecessors.split(',').map((p) => parseInt(p.trim(), 10)).includes(task.index + 1));
+      if (successorTasks.length > 0) {
+        task.LF = Math.min(...successorTasks.map((t) => t.LS));
       } else {
         task.LF = projectDuration;
-        task.LS = task.LF - task.duration;
       }
+      task.LS = task.LF - task.duration;
       task.slack = task.LS - task.ES;
     });
 
-    setCalculatedTasks(newTasks.reverse());
-    setCriticalPath(newTasks.filter(task => task.slack === 0).map(task => task.index + 1));
+    newTasks.reverse();
+    setCalculatedTasks(newTasks);
+    const criticalPathTasks = newTasks.filter((task) => task.slack === 0);
+    setCriticalPath(criticalPathTasks.map((task) => task.index + 1));
+    setCriticalPathDuration(projectDuration);
   };
 
   const generateGraph = () => {
-    const nodes = calculatedTasks.map(task => ({
+    const nodes = calculatedTasks.map((task) => ({
       id: task.index + 1,
       label: `Task ${task.index + 1}`,
       title: `Duration: ${task.duration.toFixed(2)}\nES: ${task.ES}\nEF: ${task.EF}\nLS: ${task.LS}\nLF: ${task.LF}\nSlack: ${task.slack}`,
@@ -107,12 +104,15 @@ export default function Pert() {
     }));
 
     const edges = calculatedTasks
-      .filter(task => task.predecessor)
-      .map(task => ({
-        from: parseInt(task.predecessor, 10),
-        to: task.index + 1,
-        color: criticalPath.includes(task.index + 1) && criticalPath.includes(parseInt(task.predecessor, 10)) ? 'red' : 'black',
-      }));
+      .filter((task) => task.predecessors)
+      .flatMap((task) => {
+        const predecessorIndices = task.predecessors.split(',').map((p) => parseInt(p.trim(), 10));
+        return predecessorIndices.map((predecessorIndex) => ({
+          from: predecessorIndex,
+          to: task.index + 1,
+          color: criticalPath.includes(task.index + 1) && criticalPath.includes(predecessorIndex) ? 'red' : 'black',
+        }));
+      });
 
     const data = {
       nodes,
@@ -178,7 +178,7 @@ export default function Pert() {
           onChange={handleNumTasksChange}
           className='block w-full mt-4 p-4 text-gray-900 border border-gray-300 rounded-lg text-base focus:ring-blue-500 focus:border-blue-500'
           required
-          min="1"
+          min='1'
         />
 
         {Array.from({ length: numTasks }, (_, index) => (
@@ -223,14 +223,15 @@ export default function Pert() {
             </div>
 
             <div className='w-full sm:w-1/4 px-2 mb-4'>
-              <label htmlFor={`predecessor-${index}`} className='block mb-2 text-sm font-medium text-gray-900'>
-                Predecessor (Task {index + 1})
+              <label htmlFor={`predecessors-${index}`} className='block mb-2 text-sm font-medium text-gray-900'>
+                Predecessors (Task {index + 1})
               </label>
               <input
-                type='number'
-                value={tasks[index].predecessor}
-                onChange={(e) => handleTaskChange(index, 'predecessor', e.target.value)}
+                type='text'
+                value={tasks[index].predecessors}
+                onChange={(e) => handleTaskChange(index, 'predecessors', e.target.value)}
                 className='block w-full p-4 text-gray-900 border border-gray-300 rounded-lg text-base focus:ring-blue-500 focus:border-blue-500'
+                placeholder='Enter predecessors as comma separated values'
               />
             </div>
           </div>
@@ -256,7 +257,7 @@ export default function Pert() {
                   Pessimistic
                 </th>
                 <th scope='col' className='px-6 py-3'>
-                  Predecessor
+                  Predecessors
                 </th>
                 <th scope='col' className='px-6 py-3'>
                   Duration
@@ -287,7 +288,7 @@ export default function Pert() {
                   <td className='px-6 py-4'>{task.optimistic}</td>
                   <td className='px-6 py-4'>{task.mostLikely}</td>
                   <td className='px-6 py-4'>{task.pessimistic}</td>
-                  <td className='px-6 py-4'>{task.predecessor}</td>
+                  <td className='px-6 py-4'>{task.predecessors}</td>
                   <td className='px-6 py-4'>{task.duration.toFixed(2)}</td>
                   <td className='px-6 py-4'>{task.ES}</td>
                   <td className='px-6 py-4'>{task.EF}</td>
@@ -308,6 +309,12 @@ export default function Pert() {
         >
           Download Graph
         </button>
+
+        <div className='mt-8'>
+          <h3 className='text-2xl font-bold'>Critical Path Details</h3>
+          <p className='mt-2'>Nodes of Critical Path: {criticalPath.join(', ')}</p>
+          <p className='mt-2'>Duration to Complete Critical Path: {criticalPathDuration.toFixed(2)}</p>
+        </div>
       </div>
     </div>
   );
