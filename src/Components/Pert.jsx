@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Network } from 'vis-network/standalone/umd/vis-network.min';
 import { toPng } from 'html-to-image';
 
@@ -9,43 +9,13 @@ export default function Pert() {
   const [criticalPath, setCriticalPath] = useState([]);
   const [criticalPathDuration, setCriticalPathDuration] = useState(0);
   const graphContainerRef = useRef(null);
-
-  useEffect(() => {
-    calculateForwardBackwardPass();
-  }, [tasks]);
-
-  useEffect(() => {
-    if (graphContainerRef.current) {
-      generateGraph();
-    }
-  }, [calculatedTasks]);
-
-  const handleNumTasksChange = (e) => {
-    const newNumTasks = parseInt(e.target.value, 10);
-    setNumTasks(newNumTasks);
-
-    if (newNumTasks > tasks.length) {
-      const newTasks = [...tasks];
-      for (let i = tasks.length; i < newNumTasks; i++) {
-        newTasks.push({ optimistic: '', mostLikely: '', pessimistic: '', predecessors: '' });
-      }
-      setTasks(newTasks);
-    } else {
-      setTasks(tasks.slice(0, newNumTasks));
-    }
-  };
-
-  const handleTaskChange = (index, field, value) => {
-    const newTasks = [...tasks];
-    newTasks[index][field] = value;
-    setTasks(newTasks);
-  };
+  const networkRef = useRef(null);
 
   const calculateDuration = (optimistic, mostLikely, pessimistic) => {
     return (parseFloat(optimistic) + 4 * parseFloat(mostLikely) + parseFloat(pessimistic)) / 6;
   };
 
-  const calculateForwardBackwardPass = () => {
+  const calculateForwardBackwardPass = useCallback(() => {
     const newTasks = tasks.map((task, index) => {
       const duration = calculateDuration(task.optimistic, task.mostLikely, task.pessimistic);
       return {
@@ -93,9 +63,17 @@ export default function Pert() {
     const criticalPathTasks = newTasks.filter((task) => task.slack === 0);
     setCriticalPath(criticalPathTasks.map((task) => task.index + 1));
     setCriticalPathDuration(projectDuration);
-  };
+  }, [tasks]);
 
-  const generateGraph = () => {
+  useEffect(() => {
+    calculateForwardBackwardPass();
+  }, [calculateForwardBackwardPass]);
+
+  const generateGraph = useCallback(() => {
+    if (networkRef.current) {
+      networkRef.current.destroy();
+    }
+
     const nodes = calculatedTasks.map((task) => ({
       id: task.index + 1,
       label: `Task ${task.index + 1}`,
@@ -104,19 +82,30 @@ export default function Pert() {
     }));
 
     const edges = calculatedTasks
-      .filter((task) => task.predecessors)
       .flatMap((task) => {
-        const predecessorIndices = task.predecessors.split(',').map((p) => parseInt(p.trim(), 10));
-        return predecessorIndices.map((predecessorIndex) => ({
-          from: predecessorIndex,
-          to: task.index + 1,
-          color: criticalPath.includes(task.index + 1) && criticalPath.includes(predecessorIndex) ? 'red' : 'black',
-        }));
+        if (task.predecessors) {
+          const predecessorIndices = task.predecessors.split(',').map((p) => parseInt(p.trim(), 10));
+          return predecessorIndices.map((predecessorIndex) => ({
+            from: predecessorIndex,
+            to: task.index + 1,
+            color: criticalPath.includes(task.index + 1) && criticalPath.includes(predecessorIndex) ? 'red' : 'black',
+          }));
+        }
+        return [];
       });
+
+    // Ensure Task 1 is connected to all tasks that do not have predecessors
+    const additionalEdges = calculatedTasks
+      .filter((task) => !task.predecessors && task.index !== 0)
+      .map((task) => ({
+        from: 1,
+        to: task.index + 1,
+        color: 'black',
+      }));
 
     const data = {
       nodes,
-      edges,
+      edges: [...edges, ...additionalEdges],
     };
 
     const options = {
@@ -139,7 +128,34 @@ export default function Pert() {
       interaction: { dragNodes: true },
     };
 
-    new Network(graphContainerRef.current, data, options);
+    networkRef.current = new Network(graphContainerRef.current, data, options);
+  }, [calculatedTasks, criticalPath]);
+
+  useEffect(() => {
+    if (graphContainerRef.current) {
+      generateGraph();
+    }
+  }, [generateGraph]);
+
+  const handleNumTasksChange = (e) => {
+    const newNumTasks = parseInt(e.target.value, 10);
+    setNumTasks(newNumTasks);
+
+    if (newNumTasks > tasks.length) {
+      const newTasks = [...tasks];
+      for (let i = tasks.length; i < newNumTasks; i++) {
+        newTasks.push({ optimistic: '', mostLikely: '', pessimistic: '', predecessors: '' });
+      }
+      setTasks(newTasks);
+    } else {
+      setTasks(tasks.slice(0, newNumTasks));
+    }
+  };
+
+  const handleTaskChange = (index, field, value) => {
+    const newTasks = [...tasks];
+    newTasks[index][field] = value;
+    setTasks(newTasks);
   };
 
   const handleDownloadClick = async () => {
