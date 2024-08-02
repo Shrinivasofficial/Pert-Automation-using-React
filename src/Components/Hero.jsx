@@ -25,10 +25,10 @@ export const Hero = () => {
          
           <div className='flex flex-col justify-between p-4 leading-normal'>
             <h5 className='mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white'>
-              PERT Project Management in 5 mins
+             Step 1 - Feed Your Project details.
             </h5>
             <p className='mb-3 font-normal text-gray-700 dark:text-gray-400'>
-              Here are the biggest enterprise technology acquisitions of 2021 so far, in reverse chronological order.
+              In Step 1, the project details are collected along with the number of modules.
             </p>
           </div>
         </a>
@@ -40,10 +40,10 @@ export const Hero = () => {
          
           <div className='flex flex-col justify-between p-4 leading-normal'>
             <h5 className='mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white'>
-              Noteworthy technology acquisitions 2021
+              Step - 2 Calculation of the duration.
             </h5>
             <p className='mb-3 font-normal text-gray-700 dark:text-gray-400'>
-              Here are the biggest enterprise technology acquisitions of 2021 so far, in reverse chronological order.
+             In Step - 2, the calculation of duration will be done using optimistic, most likely and pessimestic values.
             </p>
           </div>
         </a>
@@ -55,10 +55,10 @@ export const Hero = () => {
          
           <div className='flex flex-col justify-between p-4 leading-normal'>
             <h5 className='mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white'>
-              Noteworthy technology acquisitions 2021
+              Step - 3 Critical Path Calculation
             </h5>
             <p className='mb-3 font-normal text-gray-700 dark:text-gray-400'>
-              Here are the biggest enterprise technology acquisitions of 2021 so far, in reverse chronological order.
+             Download the PERT Crictical Path graph.
             </p>
           </div>
         </a>
